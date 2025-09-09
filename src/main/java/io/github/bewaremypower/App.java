@@ -1,0 +1,59 @@
+/**
+ * Copyright 2025 Yunze Xu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.bewaremypower;
+
+import static picocli.CommandLine.Command;
+import static picocli.CommandLine.Option;
+import static picocli.CommandLine.Parameters;
+
+import java.util.concurrent.Callable;
+import lombok.Getter;
+import picocli.CommandLine;
+
+@Command(
+    name = "config",
+    subcommands = {Produce.class},
+    description = "Run operations on a compacted topic")
+@Getter
+public class App implements Callable<Integer> {
+
+  @Parameters(index = "0", description = "The Kafka bootstrap servers")
+  private String bootstrapServers;
+
+  @Parameters(index = "", description = "The Kafka topic")
+  private String topic;
+
+  @Option(
+      names = {"--token"},
+      description = "authentication token (mechanism: SASL_SSL)")
+  private String token;
+
+  @Override
+  public Integer call() throws Exception {
+    System.out.println(bootstrapServers);
+    if (token == null) {
+      System.out.println("null token");
+    } else {
+      System.out.println(token);
+    }
+
+    return 0;
+  }
+
+  public static void main(String[] args) {
+    System.exit(new CommandLine(new App()).execute(args));
+  }
+}
