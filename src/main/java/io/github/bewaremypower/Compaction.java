@@ -19,15 +19,19 @@ import static picocli.CommandLine.Command;
 import static picocli.CommandLine.Option;
 import static picocli.CommandLine.ParentCommand;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import lombok.Cleanup;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AlterConfigOp;
 import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.config.ConfigResource;
 
 @Command(name = "compact", description = "Produces messages.")
+@Slf4j
 public class Compaction implements Callable<Integer> {
 
   private static final String CLEANUP_POLICY_KEY = "cleanup.policy";
@@ -39,6 +43,12 @@ public class Compaction implements Callable<Integer> {
       names = {"--apply"},
       description = "Enable compaction for the topic")
   boolean enableCompaction;
+
+  @Option(
+      names = {"--set-key-ts"},
+      description =
+          "Set the oldest message's timestamp, key-values before this timestamp will be deleted")
+  long keyTimestamp = -1L;
 
   @Override
   public Integer call() throws Exception {
@@ -66,6 +76,32 @@ public class Compaction implements Callable<Integer> {
                             AlterConfigOp.OpType.SET))))
             .all()
             .get();
+      }
+    }
+    if (keyTimestamp >= 0) {
+      @Cleanup final var consumer = app.newConsumer("random-group-" + System.currentTimeMillis());
+      final var keysToDelete = new HashSet<String>();
+      KafkaUtils.replayTopic(
+          consumer,
+          app.getTopic(),
+          record -> {
+            if (record.timestamp() <= keyTimestamp) {
+              keysToDelete.add(record.key());
+              log.info("Add key {} to the delete list", record.key());
+            } else {
+              // There are values for new keys, don't remove these keys
+              if (keysToDelete.remove(record.key())) {
+                log.info("Retain key {} because it appears in latest messages", record.key());
+              }
+            }
+          });
+      if (!keysToDelete.isEmpty()) {
+        log.info("Keys to delete: {}", keysToDelete);
+        @Cleanup final var producer = app.newProducer();
+        for (final var key : keysToDelete) {
+          producer.send(new ProducerRecord<>(app.getTopic(), key, null)).get();
+          log.info("Deleted key {}", key);
+        }
       }
     }
     return 0;

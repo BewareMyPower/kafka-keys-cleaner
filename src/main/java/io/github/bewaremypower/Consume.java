@@ -19,14 +19,9 @@ import static picocli.CommandLine.Command;
 import static picocli.CommandLine.Parameters;
 import static picocli.CommandLine.ParentCommand;
 
-import java.time.Duration;
-import java.util.Collection;
-import java.util.List;
 import java.util.concurrent.Callable;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
-import org.apache.kafka.common.TopicPartition;
 
 @Command(name = "consume", description = "Produces messages.")
 @Slf4j
@@ -40,34 +35,19 @@ public class Consume implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     @Cleanup final var consumer = app.newConsumer(groupId);
-    consumer.subscribe(
-        List.of(app.getTopic()),
-        new ConsumerRebalanceListener() {
-          @Override
-          public void onPartitionsRevoked(Collection<TopicPartition> collection) {}
-
-          @Override
-          public void onPartitionsAssigned(Collection<TopicPartition> collection) {
-            log.info("{} is assigned with {}", groupId, collection);
-          }
+    KafkaUtils.replayTopic(
+        consumer,
+        app.getTopic(),
+        r -> {
+          log.info(
+              "Received {} => {} from {}-{}@{} timestamp: {}",
+              r.key(),
+              r.value(),
+              r.topic(),
+              r.partition(),
+              r.offset(),
+              r.timestamp());
         });
-    var lastReceived = System.currentTimeMillis();
-    while (System.currentTimeMillis() - lastReceived < 6000) {
-      final var records = consumer.poll(Duration.ofMillis(100));
-      records.forEach(
-          r ->
-              log.info(
-                  "Received {} => {} from {}-{}@{} timestamp: {}",
-                  r.key(),
-                  r.value(),
-                  r.topic(),
-                  r.partition(),
-                  r.offset(),
-                  r.timestamp()));
-      if (!records.isEmpty()) {
-        lastReceived = System.currentTimeMillis();
-      }
-    }
     return 0;
   }
 }
