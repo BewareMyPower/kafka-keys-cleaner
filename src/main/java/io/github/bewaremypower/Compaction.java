@@ -27,6 +27,7 @@ import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.AlterConfigOp;
 import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.config.ConfigResource;
 
@@ -38,6 +39,11 @@ public class Compaction implements Callable<Integer> {
   private static final String CLEANUP_POLICY_VALUE = "compact";
 
   @ParentCommand App app;
+
+  @Option(
+      names = {"--create"},
+      description = "Create a compacted topic")
+  boolean createCompactedTopic;
 
   @Option(
       names = {"--apply"},
@@ -53,6 +59,17 @@ public class Compaction implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     @Cleanup final var admin = app.newAdmin();
+    if (createCompactedTopic) {
+      admin
+          .createTopics(
+              List.of(
+                  new NewTopic(app.getTopic(), 1, (short) 1)
+                      .configs(Map.of(CLEANUP_POLICY_KEY, CLEANUP_POLICY_VALUE))))
+          .all()
+          .get();
+      return 0;
+    }
+
     if (enableCompaction) {
       final var resource = new ConfigResource(ConfigResource.Type.TOPIC, app.getTopic());
       final var configs = admin.describeConfigs(List.of(resource)).all().get();
@@ -77,6 +94,7 @@ public class Compaction implements Callable<Integer> {
             .all()
             .get();
       }
+      return 0;
     }
     if (keyTimestamp >= 0) {
       @Cleanup final var consumer = app.newConsumer("random-group-" + System.currentTimeMillis());
