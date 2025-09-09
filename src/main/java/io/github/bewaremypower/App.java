@@ -25,16 +25,19 @@ import lombok.Getter;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import picocli.CommandLine;
 
 @Command(
     name = "config",
-    subcommands = {Produce.class, Compaction.class},
+    subcommands = {Produce.class, Compaction.class, Consume.class},
     description = "Run operations on a compacted topic")
 public class App implements Callable<Integer> {
 
@@ -64,6 +67,23 @@ public class App implements Callable<Integer> {
       configureSasl(properties, token);
     }
     return new KafkaProducer<>(properties);
+  }
+
+  public KafkaConsumer<String, String> newConsumer(String groupId) {
+    final var properties = new Properties();
+    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    properties.put(
+        ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    properties.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    // Read from earliest each time
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+    if (token != null) {
+      configureSasl(properties, token);
+    }
+    return new KafkaConsumer<>(properties);
   }
 
   public AdminClient newAdmin() {
