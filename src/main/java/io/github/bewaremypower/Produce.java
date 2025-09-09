@@ -42,7 +42,7 @@ public class Produce implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
-    @Cleanup final var producer = KafkaUtils.newProducer(app.getBootstrapServers(), app.getToken());
+    @Cleanup final var producer = app.newProducer();
     @Cleanup final var stream = Files.lines(file.toPath());
     stream.forEach(
         s -> {

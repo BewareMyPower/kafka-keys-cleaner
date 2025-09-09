@@ -19,20 +19,29 @@ import static picocli.CommandLine.Command;
 import static picocli.CommandLine.Option;
 import static picocli.CommandLine.Parameters;
 
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import lombok.Getter;
+import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.KafkaAdminClient;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.security.auth.SecurityProtocol;
+import org.apache.kafka.common.serialization.StringSerializer;
 import picocli.CommandLine;
 
 @Command(
     name = "config",
-    subcommands = {Produce.class},
+    subcommands = {Produce.class, Compaction.class},
     description = "Run operations on a compacted topic")
-@Getter
 public class App implements Callable<Integer> {
 
   @Parameters(index = "0", description = "The Kafka bootstrap servers")
   private String bootstrapServers;
 
+  @Getter
   @Parameters(index = "", description = "The Kafka topic")
   private String topic;
 
@@ -44,6 +53,39 @@ public class App implements Callable<Integer> {
   @Override
   public Integer call() {
     return 0;
+  }
+
+  public KafkaProducer<String, String> newProducer() {
+    final var properties = new Properties();
+    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    if (token != null) {
+      configureSasl(properties, token);
+    }
+    return new KafkaProducer<>(properties);
+  }
+
+  public AdminClient newAdmin() {
+    final var properties = new Properties();
+    properties.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    if (token != null) {
+      configureSasl(properties, token);
+    }
+    return KafkaAdminClient.create(properties);
+  }
+
+  private static void configureSasl(Properties properties, String token) {
+    properties.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, SecurityProtocol.SASL_SSL.name());
+    properties.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
+    properties.put(
+        SaslConfigs.SASL_JAAS_CONFIG,
+        String.format(
+            """
+                              org.apache.kafka.common.security.plain.PlainLoginModule \
+                              required username="user" password="token:%s";
+                              """,
+            token));
   }
 
   public static void main(String[] args) {
