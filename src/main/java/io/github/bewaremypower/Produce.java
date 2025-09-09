@@ -43,30 +43,30 @@ public class Produce implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     @Cleanup final var producer = KafkaUtils.newProducer(app.getBootstrapServers(), app.getToken());
-    Files.lines(file.toPath())
-        .forEach(
-            s -> {
-              final var tokens = s.split("=>");
-              if (tokens.length != 2) {
-                return;
-              }
-              final var key = tokens[0].trim();
-              final var value = tokens[1].trim();
-              try {
-                final var metadata =
-                    producer.send(new ProducerRecord<>(app.getTopic(), null, key, value)).get();
-                log.info(
-                    "Sent {} => {} to {}-{}@{} timestamp: {}",
-                    key,
-                    value,
-                    metadata.topic(),
-                    metadata.partition(),
-                    metadata.offset(),
-                    metadata.timestamp());
-              } catch (InterruptedException | ExecutionException e) {
-                log.error("Failed to send {} => {}", key, value, e);
-              }
-            });
+    @Cleanup final var stream = Files.lines(file.toPath());
+    stream.forEach(
+        s -> {
+          final var tokens = s.split("=>");
+          if (tokens.length != 2) {
+            return;
+          }
+          final var key = tokens[0].trim();
+          final var value = tokens[1].trim();
+          try {
+            final var metadata =
+                producer.send(new ProducerRecord<>(app.getTopic(), null, key, value)).get();
+            log.info(
+                "Sent {} => {} to {}-{}@{} timestamp: {}",
+                key,
+                value,
+                metadata.topic(),
+                metadata.partition(),
+                metadata.offset(),
+                metadata.timestamp());
+          } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to send {} => {}", key, value, e);
+          }
+        });
     return 0;
   }
 }
