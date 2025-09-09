@@ -38,10 +38,12 @@ public class KafkaUtils {
       properties.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
       properties.put(
           SaslConfigs.SASL_JAAS_CONFIG,
-          """
-                    org.apache.kafka.common.security.plain.PlainLoginModule \
-                    required username="public/default" password="token:xxx"
-                    """);
+          String.format(
+              """
+                        org.apache.kafka.common.security.plain.PlainLoginModule \
+                        required username="user" password="token:%s";
+                        """,
+              token));
     }
     return new KafkaProducer<>(properties);
   }

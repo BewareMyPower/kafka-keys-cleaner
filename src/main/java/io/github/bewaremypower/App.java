@@ -42,14 +42,7 @@ public class App implements Callable<Integer> {
   private String token;
 
   @Override
-  public Integer call() throws Exception {
-    System.out.println(bootstrapServers);
-    if (token == null) {
-      System.out.println("null token");
-    } else {
-      System.out.println(token);
-    }
-
+  public Integer call() {
     return 0;
   }
 
