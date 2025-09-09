@@ -1,0 +1,7 @@
+K0 => V0
+K0 => V1
+K1 => V0
+K2 => v0
+# we're going to set this as the earliest timestamp retained
+K1 => V1
+K0 => V2
